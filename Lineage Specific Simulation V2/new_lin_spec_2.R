@@ -193,7 +193,7 @@ break_up_state_jumps <- function(edge_tb) {
 assign_edge_program_value <- function(edge_tb, from, v0, program_name, root = F) {
   
   j <<- j+1
-  if (j %% 1 == 0) {
+  if (j %% 1000 == 0) {
     message(j)
   }
   
@@ -230,7 +230,7 @@ assign_edge_program_value <- function(edge_tb, from, v0, program_name, root = F)
       walk = c(start_val, start_val + v0)
       v_end = v0
     } else {
-      error = rnorm(num_steps-1,0,step_size/100)
+      error = rnorm(num_steps-1,0,step_size/20)
       coefs = cumsum(map_dbl(0:(num_steps-1), function(i) eta^i))
       error_terms = c(0,map_dbl(1:length(error), function(i) sum(error[1:i]*rev(coefs[1:i]))))
       walk = c(start_val,coefs*v0 + error_terms + start_val)
@@ -362,7 +362,7 @@ t_total = edge_tb %>% nest(data = -c(block,st)) %>% mutate(block_length = map_db
 })) %>% group_by(st) %>% summarise(avg_block_length = mean(block_length))
 
 step_size = 1/100
-delta = 0.3^60 * (1-0.3)
+delta = 10^-10
 edge_proportion = 0.5
 
 edge_length_tb$eta = map_dbl(1:nrow(edge_length_tb), function(n) {
@@ -375,6 +375,7 @@ edge_length_tb$eta = map_dbl(1:nrow(edge_length_tb), function(n) {
 })
 
 #set v0
+set.seed(3)
 num_program = 1
 edge_length_tb$v0 = map(1:nrow(edge_length_tb), function(n) {
   v0_vec = rnorm(num_program,0,0.2)
@@ -388,6 +389,9 @@ edge_length_tb$v0 = map(1:nrow(edge_length_tb), function(n) {
 })
 
 edges = edge_length_tb
+
+#subset edge_tb if necessary
+edge_tb = edge_tb %>% filter(from_time <= 6)
 
 #simulate gene programs
 for (i in 1:num_program) {
@@ -429,36 +433,52 @@ x = edge_tb %>% filter(block == '372oskq7do')
 desired_blocks = c(unique(edge_tb$block[edge_tb$from %in% x$to]))
 plot_tb = edge_tb %>%
   filter(block %in% desired_blocks) %>%
-  select(block, st, program1, to) %>%
-  unnest(cols = program1)
+  select(block, st, program2, to, to_type) %>%
+  unnest(cols = program2)
 plot_tb$block = factor(plot_tb$block, levels = desired_blocks)
 
-ggplot(data = plot_tb) +
+plot = ggplot(data = plot_tb) +
   geom_line(aes(x = time, y = value, color = block, group = to)) +
-  scale_colour_manual(values = c("ffuzx3ppb2" = "#fc8d59",
-                                 "3p9w71izkv" = "#7bccc4",
-                                 "zitdn26jp9" = "#43a2ca",
-                                 "vmlpojbho5" = "#b30000",
+  scale_colour_manual(values = c("ffuzx3ppb2" = "#641E16",
+                                 "kuak69bmdr" = "#922B21",
+                                 "vmlpojbho5" = "#C0392B",
+                                 "qioocqacw1" = "#D98880",
+                                 "3p9w71izkv" = "#154360",
+                                 "8mdpc5cy9e" = "#1F618D",
+                                 "zitdn26jp9" = "#2980B9",
+                                 "812q1tvfbl" = "#7FB3D5",
                                  "372oskq7do" = "black")) +
   theme_pubr() +
-  xlab('Time') + ylab('Value') + labs(colour = 'State Transition') +
+  xlab('Time (Days)') + ylab('Value (AU)') + labs(colour = 'State Transition') +
   theme(legend.position = 'right')
 
+png(filename = './large_tree_program.png',
+    width = 6, height = 4, units = "in", res = 1000)
+print(plot)
+dev.off()
+
 #plot for larger tree
+program_name = 'program1'
+plot_tb = edge_tb %>% filter(to_time <= 7) %>%
+  select(block, st, program_name, to, to_type) %>%
+  unnest(cols = program_name)
 
-plot_tb = edge_tb %>% filter(from_time <= 6) %>%
-  select(block, st, program1, to) %>%
-  unnest(cols = program1)
-
-ggplot(data = plot_tb) +
-  geom_line(aes(x = time, y = value, color = st,
-                group = to, alpha = block)) +
+plot = ggplot(data = plot_tb) +
+  geom_line(aes(x = time, y = value, color = to_type,
+                group = to)) +
+  scale_color_manual(values = color_values) +
   theme_pubr() +
-  xlab('Time') + ylab('Value') + labs(colour = 'State Transition') +
-  theme(legend.position = 'none')
+  xlab('Time (Days)') + ylab('Value (AU)') + labs(colour = 'Outgoing Cell Type') +
+  theme(legend.position = 'right')
+
+png(filename = './large_tree_program3.png',
+    width = 6, height = 4, units = "in", res = 1000)
+print(plot)
+dev.off()
 
 #track a few cells of same terminal type to root
-tips = edge_tb$to[!(edge_tb$to %in% edge_tb$from) & edge_tb$to_type == 'Ery2'][1:100]
+tips = c(edge_tb$to[!(edge_tb$to %in% edge_tb$from) & edge_tb$to_type == 'Ery2'][1:10],
+         edge_tb$to[!(edge_tb$to %in% edge_tb$from) & edge_tb$to_type == 'ExE'][1:10])
 
 edge_list = data.frame()
 for (tip in tips) {
@@ -472,15 +492,21 @@ for (tip in tips) {
 }
 
 plot_tb = edge_list %>%
-  select(block, st, program1, to) %>%
-  unnest(cols = program1)
+  select(block, st, program2, to, to_type) %>%
+  unnest(cols = program2)
 
-ggplot(data = plot_tb) +
-  geom_line(aes(x = time, y = value, color = block,
+plot = ggplot(data = plot_tb) +
+  geom_line(aes(x = time, y = value, color = to_type,
                 group = to)) +
+  scale_color_manual(values = color_values) +
   theme_pubr() +
-  xlab('Time') + ylab('Value') + labs(colour = 'State Transition') +
-  theme(legend.position = 'none')
+  xlab('Time (Days)') + ylab('Value (AU)') + labs(colour = 'Outgoing Cell Type') +
+  theme(legend.position = 'right')
+
+png(filename = './large_tree_program.png',
+    width = 6, height = 4, units = "in", res = 1000)
+print(plot)
+dev.off()
 
 #convert to gene expression
 num_genes = 250
