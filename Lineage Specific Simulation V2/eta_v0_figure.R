@@ -1,8 +1,9 @@
 num_steps = 800
 start_val = 1
+delta = 10^-10
 eta_vals = c(0.2,0.8)
 v0_vals = c(0.01,0.1)
-esd_vals = c(step_size/10, step_size/100)
+esd_vals = c(step_size/10, step_size/20, step_size/100)
 num_rep = 5
 
 plot_tb = data.frame()
@@ -31,7 +32,7 @@ for (eta in eta_vals) {
   }
 }
 
-ggplot(data = plot_tb, aes(x = time, y = value, group = rep)) +
+plot = ggplot(data = plot_tb, aes(x = time, y = value, group = rep)) +
   geom_line() + facet_wrap(~esd+v0+eta, ncol = 4) +
   geom_vline(aes(xintercept = t_stable),
              linetype = 2,
@@ -41,6 +42,11 @@ ggplot(data = plot_tb, aes(x = time, y = value, group = rep)) +
            color = 'blue') +
   xlab('Time (Days)') + ylab('Value (AU)') +
   theme_pubr() + theme(legend.position = 'right')
+
+png(filename = './eta_v0_figure.png',
+    width = 5, height = 5, units = "in", res = 1000)
+print(plot)
+dev.off()
 
 # eta = 0.1
 # v0 = 0.1
